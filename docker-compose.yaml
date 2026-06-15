@@ -1,0 +1,56 @@
+# AgentGraphed stack for Coolify (build_pack = dockercompose).
+#
+#   agentgraphed  — the dashboard, built from ./Dockerfile, reads sessions (ro)
+#   syncthing     — the sync hub; workstations push their sessions here
+#   ingest-cron   — pokes the ingest endpoint every 5 min so data stays fresh
+#
+# Coolify builds + runs this on a single node, so the named volumes are
+# node-local — which is exactly what SQLite (the `db` volume) requires.
+
+services:
+  agentgraphed:
+    build:
+      context: .
+    environment:
+      # Aggregation roots: one subfolder per machine, populated by syncthing.
+      - AGENTGRAPHED_DATA_DIR=/data
+      - AGENTGRAPHED_CLAUDE_DIR=/sources/claude
+      - AGENTGRAPHED_CODEX_DIR=/sources/codex
+      - PORT=3737
+      - HOSTNAME=0.0.0.0
+      # Domain is wired by Coolify/Traefik once Authentik forward-auth is in
+      # place; set via SERVICE_FQDN at deploy time, not hardcoded here.
+    volumes:
+      - db:/data                # node-local; SQLite WAL must not be on NFS/CIFS
+      - sources:/sources:ro     # read-only: never write into synced session data
+    restart: unless-stopped
+
+  syncthing:
+    image: syncthing/syncthing:1
+    hostname: agentgraphed-hub
+    environment:
+      - PUID=1000
+      - PGID=1000
+    volumes:
+      - st-config:/var/syncthing/config
+      - sources:/var/syncthing/sources   # same volume agentgraphed reads at /sources
+    ports:
+      - "22000:22000/tcp"   # sync protocol
+      - "22000:22000/udp"   # QUIC
+      - "21027:21027/udp"   # local discovery
+      # GUI 8384 intentionally NOT published — internal only (reach via coolify exec / SSH tunnel)
+    restart: unless-stopped
+
+  ingest-cron:
+    image: curlimages/curl:latest
+    depends_on:
+      - agentgraphed
+    entrypoint: ["sh", "-c"]
+    command:
+      - "while true; do sleep 300; curl -fsS -m 120 -X POST http://agentgraphed:3737/api/ingest-local >/dev/null 2>&1 || true; done"
+    restart: unless-stopped
+
+volumes:
+  db:
+  sources:
+  st-config:
