@@ -12,14 +12,17 @@ services:
     build:
       context: .
     environment:
+      # Tells Coolify THIS service is the web-facing one, on port 3737, so it
+      # generates the Traefik route to the app's configured domain. Without it
+      # Coolify routes nothing (Traefik 404). The actual hostname is set on the
+      # Coolify app, not here.
+      - SERVICE_FQDN_AGENTGRAPHED_3737
       # Aggregation roots: one subfolder per machine, populated by syncthing.
       - AGENTGRAPHED_DATA_DIR=/data
       - AGENTGRAPHED_CLAUDE_DIR=/sources/claude
       - AGENTGRAPHED_CODEX_DIR=/sources/codex
       - PORT=3737
       - HOSTNAME=0.0.0.0
-      # Domain is wired by Coolify/Traefik once Authentik forward-auth is in
-      # place; set via SERVICE_FQDN at deploy time, not hardcoded here.
     volumes:
       - db:/data                # node-local; SQLite WAL must not be on NFS/CIFS
       - sources:/sources:ro     # read-only: never write into synced session data
