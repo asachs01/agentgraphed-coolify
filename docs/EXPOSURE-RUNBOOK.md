@@ -82,3 +82,24 @@ curl -sS -o /dev/null -w "%{http_code}\n" https://agentgraphed.sachshaus.net/
 # expect 302 -> auth.sachshaus.net (Authentik login), NOT 200
 ```
 A `200` without redirect means auth is NOT applied — stop and fix before cutover.
+
+---
+
+## STATUS: LIVE (2026-06-17)
+
+All exposure steps complete and verified:
+
+- **Authentik**: provider pk=4 + application `agentgraphed` (forward_domain, mirrors
+  `diagrams`: flows, cookie_domain, 5 property mappings incl. Proxy outpost,
+  intercept_header_auth). Bound to embedded outpost (providers [3,4]). 0 policy
+  bindings = all authenticated users (same as diagrams).
+- **Cloudflare DNS**: proxied CNAME `agentgraphed.sachshaus.net` ->
+  `b84f97dc-23aa-4388-805e-44af6bfd313e.cfargotunnel.com` (record id
+  2d9b080dc131bf4e8fbe710191a9ac96).
+- **Cloudflare Tunnel** (`coolify`, id b84f97dc...): ingress rule
+  `agentgraphed.sachshaus.net -> http://coolify-proxy:80` added before the
+  catch-all 404. Snapshot in `docs/tunnel-ingress.json`.
+
+Verified: `https://agentgraphed.sachshaus.net/` -> HTTP/2 302 -> Authentik login
+with scope `openid email ak_proxy profile entitlements`; app container healthy
+(internal 200). Full chain Cloudflare -> tunnel -> Traefik -> Authentik -> app.

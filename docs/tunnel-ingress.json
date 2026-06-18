@@ -1,0 +1,13 @@
+[
+  {
+    "service": "http://coolify-proxy:80",
+    "hostname": "diagrams.sachshaus.net"
+  },
+  {
+    "hostname": "agentgraphed.sachshaus.net",
+    "service": "http://coolify-proxy:80"
+  },
+  {
+    "service": "http_status:404"
+  }
+]
